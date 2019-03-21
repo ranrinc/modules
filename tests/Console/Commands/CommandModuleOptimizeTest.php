@@ -8,7 +8,7 @@ class CommandModuleOptimizeTest extends BaseTestCase
 {
     protected $finder;
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
@@ -20,10 +20,10 @@ class CommandModuleOptimizeTest extends BaseTestCase
     /** @test */
     public function it_can_optimize_a_module()
     {
-        $before = file_get_contents(storage_path('app/modules.json'));
+        $before = file_get_contents(storage_path('app/modules/app.json'));
 
         $this->assertSame(
-            '{
+'{
     "Optimize": {
         "basename": "Optimize",
         "name": "Optimize",
@@ -40,23 +40,21 @@ class CommandModuleOptimizeTest extends BaseTestCase
 
         //
 
-        file_put_contents(module_path('optimize').'/module.json',
-            json_encode(
-                array_merge(
-                    json_decode(file_get_contents(module_path('optimize').'/module.json'), true),
-                    ['version' => '1.3.3.7']
-                )
-            , JSON_PRETTY_PRINT)
-        );
+        $modulePath = module_path('optimize') . '/module.json';
+        $manifest = json_decode(file_get_contents($modulePath), true);
+        $manifest['version'] = '1.3.3.7';
+        $manifest = json_encode($manifest, JSON_PRETTY_PRINT);
+
+        file_put_contents($modulePath, $manifest);
 
         $this->artisan('module:optimize');
 
         //
 
-        $optimized = file_get_contents(storage_path('app/modules.json'));
+        $optimized = file_get_contents(storage_path('app/modules/app.json'));
 
         $this->assertSame(
-            '{
+'{
     "Optimize": {
         "basename": "Optimize",
         "name": "Optimize",
@@ -72,7 +70,7 @@ class CommandModuleOptimizeTest extends BaseTestCase
         );
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         $this->finder->deleteDirectory(module_path('optimize'));
 

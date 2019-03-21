@@ -2,13 +2,11 @@
 
 namespace Caffeinated\Modules;
 
+use Illuminate\Support\ServiceProvider;
 use Caffeinated\Modules\Contracts\Repository;
 use Caffeinated\Modules\Providers\BladeServiceProvider;
 use Caffeinated\Modules\Providers\ConsoleServiceProvider;
 use Caffeinated\Modules\Providers\GeneratorServiceProvider;
-use Caffeinated\Modules\Providers\HelperServiceProvider;
-use Caffeinated\Modules\Providers\RepositoryServiceProvider;
-use Illuminate\Support\ServiceProvider;
 
 class ModulesServiceProvider extends ServiceProvider
 {
@@ -16,11 +14,9 @@ class ModulesServiceProvider extends ServiceProvider
      * @var bool Indicates if loading of the provider is deferred.
      */
     protected $defer = false;
-
+    
     /**
-     * Boot the service provider.
-     *
-     * @return void
+     * Bootstrap the provided services.
      */
     public function boot()
     {
@@ -32,9 +28,7 @@ class ModulesServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the service provider.
-     *
-     * @return void
+     * Register the provided services.
      */
     public function register()
     {
@@ -44,19 +38,15 @@ class ModulesServiceProvider extends ServiceProvider
 
         $this->app->register(ConsoleServiceProvider::class);
         $this->app->register(GeneratorServiceProvider::class);
-        $this->app->register(HelperServiceProvider::class);
-        $this->app->register(RepositoryServiceProvider::class);
         $this->app->register(BladeServiceProvider::class);
 
         $this->app->singleton('modules', function ($app) {
-            $repository = $app->make(Repository::class);
-
-            return new Modules($app, $repository);
+            return new RepositoryManager($app);
         });
     }
 
     /**
-     * Get the services provided by the provider.
+     * Get the services provided by the package.
      *
      * @return array
      */
@@ -65,16 +55,22 @@ class ModulesServiceProvider extends ServiceProvider
         return ['modules'];
     }
 
+    /**
+     * Register compilable code.
+     * 
+     * @return array
+     */
     public static function compiles()
     {
-        $modules = app()->make('modules')->all();
-        $files   = [];
+        $files = [];
 
-        foreach ($modules as $module) {
-            $serviceProvider = module_class($module['slug'], 'Providers\\ModuleServiceProvider');
+        foreach (modules()->repositories() as $repository) {
+            foreach ($repository->all() as $module) {
+                $serviceProvider = module_class($module['slug'], 'Providers\\ModuleServiceProvider', $repository->location);
 
-            if (class_exists($serviceProvider)) {
-                $files = array_merge($files, forward_static_call([$serviceProvider, 'compiles']));
+                if (class_exists($serviceProvider)) {
+                    $files = array_merge($files, forward_static_call([$serviceProvider, 'compiles']));
+                }
             }
         }
 

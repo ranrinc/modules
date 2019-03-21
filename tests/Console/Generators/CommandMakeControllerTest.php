@@ -11,7 +11,7 @@ class CommandMakeControllerTest extends BaseTestCase
 
     protected $finder;
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
@@ -43,7 +43,7 @@ class CommandMakeControllerTest extends BaseTestCase
     /** @test */
     public function it_can_generate_a_new_controller_with_custom_module_namespace()
     {
-        $this->app['config']->set('modules.namespace', 'App\\CustomModuleNamespace\\');
+        $this->app['config']->set("modules.locations.$this->default.namespace", 'App\\CustomModuleNamespace\\');
 
         $this->artisan('make:module:controller', ['slug' => 'controller', 'name' => 'CustomController']);
 
@@ -52,7 +52,7 @@ class CommandMakeControllerTest extends BaseTestCase
         $this->assertMatchesSnapshot($file);
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         $this->finder->deleteDirectory(module_path('controller'));
 

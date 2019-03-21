@@ -2,13 +2,14 @@
 
 namespace Caffeinated\Modules\Console\Commands;
 
-use Caffeinated\Modules\Modules;
-use Caffeinated\Modules\Traits\MigrationTrait;
 use Illuminate\Console\Command;
 use Illuminate\Console\ConfirmableTrait;
+use Caffeinated\Modules\RepositoryManager;
 use Illuminate\Database\Migrations\Migrator;
-use Symfony\Component\Console\Input\InputArgument;
+use Caffeinated\Modules\Traits\MigrationTrait;
+use Caffeinated\Modules\Repositories\Repository;
 use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Input\InputArgument;
 
 class ModuleMigrateRollbackCommand extends Command
 {
@@ -36,7 +37,7 @@ class ModuleMigrateRollbackCommand extends Command
     protected $migrator;
 
     /**
-     * @var Modules
+     * @var RepositoryManager
      */
     protected $module;
 
@@ -44,14 +45,14 @@ class ModuleMigrateRollbackCommand extends Command
      * Create a new command instance.
      *
      * @param Migrator $migrator
-     * @param Modules  $module
+     * @param RepositoryManager  $module
      */
-    public function __construct(Migrator $migrator, Modules $module)
+    public function __construct(Migrator $migrator, RepositoryManager $module)
     {
         parent::__construct();
 
         $this->migrator = $migrator;
-        $this->module = $module;
+        $this->module   = $module;
     }
 
     /**
@@ -66,11 +67,36 @@ class ModuleMigrateRollbackCommand extends Command
         }
 
         $this->migrator->setConnection($this->option('database'));
+        
+        $repository = modules()->location($this->option('location'));
+        $paths      = $this->getMigrationPaths($repository);
 
-        $paths = $this->getMigrationPaths();
         $this->migrator->setOutput($this->output)->rollback(
-            $paths, ['pretend' => $this->option('pretend'), 'step' => (int) $this->option('step')]
+            $paths, ['pretend' => $this->option('pretend'), 'step' => (int)$this->option('step')]
         );
+    }
+
+    /**
+     * Get all of the migration paths.
+     *
+     * @param \Caffeinated\Modules\Repositories\Repository $repository
+     *
+     * @return array
+     */
+    protected function getMigrationPaths(Repository $repository)
+    {
+        $slug  = $this->argument('slug');
+        $paths = [];
+
+        if ($slug) {
+            $paths[] = module_path($slug, 'Database/Migrations', $repository->location);
+        } else {
+            foreach ($repository->all() as $module) {
+                $paths[] = module_path($module['slug'], 'Database/Migrations', $repository->location);
+            }
+        }
+
+        return $paths;
     }
 
     /**
@@ -95,27 +121,7 @@ class ModuleMigrateRollbackCommand extends Command
             ['force', null, InputOption::VALUE_NONE, 'Force the operation to run while in production.'],
             ['pretend', null, InputOption::VALUE_NONE, 'Dump the SQL queries that would be run.'],
             ['step', null, InputOption::VALUE_OPTIONAL, 'The number of migrations to be reverted.'],
+            ['location', null, InputOption::VALUE_OPTIONAL, 'Which modules location to use.'],
         ];
-    }
-
-    /**
-     * Get all of the migration paths.
-     *
-     * @return array
-     */
-    protected function getMigrationPaths()
-    {
-        $slug = $this->argument('slug');
-        $paths = [];
-
-        if ($slug) {
-            $paths[] = module_path($slug, 'Database/Migrations');
-        } else {
-            foreach ($this->module->all() as $module) {
-                $paths[] = module_path($module['slug'], 'Database/Migrations');
-            }
-        }
-
-        return $paths;
     }
 }

@@ -7,7 +7,7 @@ use Illuminate\Support\ServiceProvider;
 class GeneratorServiceProvider extends ServiceProvider
 {
     /**
-     * Bootstrap the application services.
+     * Bootstrap the provided services.
      */
     public function boot()
     {
@@ -15,7 +15,7 @@ class GeneratorServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the application services.
+     * Register the provided services.
      */
     public function register()
     {
@@ -30,6 +30,7 @@ class GeneratorServiceProvider extends ServiceProvider
             'command.make.module.request'    => \Caffeinated\Modules\Console\Generators\MakeRequestCommand::class,
             'command.make.module.seeder'     => \Caffeinated\Modules\Console\Generators\MakeSeederCommand::class,
             'command.make.module.test'       => \Caffeinated\Modules\Console\Generators\MakeTestCommand::class,
+            'command.make.module.job'        => \Caffeinated\Modules\Console\Generators\MakeJobCommand::class,
         ];
 
         foreach ($generators as $slug => $class) {

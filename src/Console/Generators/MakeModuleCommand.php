@@ -2,9 +2,9 @@
 
 namespace Caffeinated\Modules\Console\Generators;
 
-use Caffeinated\Modules\Modules;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use Caffeinated\Modules\RepositoryManager;
 use Symfony\Component\Console\Helper\ProgressBar;
 
 class MakeModuleCommand extends Command
@@ -16,7 +16,8 @@ class MakeModuleCommand extends Command
      */
     protected $signature = 'make:module
         {slug : The slug of the module}
-        {--Q|quick : Skip the make:module wizard and use default values}';
+        {--Q|quick : Skip the make:module wizard and use default values}
+        {--location= : The modules location.}';
 
     /**
      * The console command description.
@@ -28,7 +29,7 @@ class MakeModuleCommand extends Command
     /**
      * The modules instance.
      *
-     * @var Modules
+     * @var RepositoryManager
      */
     protected $module;
 
@@ -50,26 +51,14 @@ class MakeModuleCommand extends Command
      * Create a new command instance.
      *
      * @param Filesystem $files
-     * @param Modules $module
+     * @param RepositoryManager $module
      */
-    public function __construct(Filesystem $files, Modules $module)
+    public function __construct(Filesystem $files, RepositoryManager $module)
     {
         parent::__construct();
 
         $this->files = $files;
         $this->module = $module;
-    }
-
-    /**
-     * Get the console command options.
-     *
-     * @return array
-     */
-    public function getOptions()
-    {
-        return [
-            ['quick', null, InputOption::VALUE_OPTIONAL, 'Skip the make:module wizard and use default values.', null],
-        ];
     }
 
     /**
@@ -79,14 +68,19 @@ class MakeModuleCommand extends Command
      */
     public function handle()
     {
-        $this->container['slug'] = str_slug($this->argument('slug'));
-        $this->container['name'] = studly_case($this->container['slug']);
-        $this->container['version'] = '1.0';
+        $location = $this->option('location');
+
+        $this->container['slug']        = str_slug($this->argument('slug'));
+        $this->container['name']        = studly_case($this->container['slug']);
+        $this->container['version']     = '1.0';
         $this->container['description'] = 'This is the description for the ' . $this->container['name'] . ' module.';
+        $this->container['location']    = $location ?: config('modules.default_location');
+        $this->container['provider']    = config("modules.locations.{$this->container['location']}.provider");
 
         if ($this->option('quick')) {
-            $this->container['basename'] = studly_case($this->container['slug']);
-            $this->container['namespace'] = config('modules.namespace') . $this->container['basename'];
+            $this->container['basename']  = studly_case($this->container['slug']);
+            $this->container['namespace'] = config("modules.locations.{$this->container['location']}.namespace").$this->container['basename'];
+
             return $this->generate();
         }
 
@@ -147,12 +141,12 @@ class MakeModuleCommand extends Command
     {
         $this->displayHeader('make_module_step_1');
 
-        $this->container['name'] = $this->ask('Please enter the name of the module:', $this->container['name']);
-        $this->container['slug'] = $this->ask('Please enter the slug for the module:', $this->container['slug']);
-        $this->container['version'] = $this->ask('Please enter the module version:', $this->container['version']);
+        $this->container['name']        = $this->ask('Please enter the name of the module:', $this->container['name']);
+        $this->container['slug']        = $this->ask('Please enter the slug for the module:', $this->container['slug']);
+        $this->container['version']     = $this->ask('Please enter the module version:', $this->container['version']);
         $this->container['description'] = $this->ask('Please enter the description of the module:', $this->container['description']);
-        $this->container['basename'] = studly_case($this->container['slug']);
-        $this->container['namespace'] = config('modules.namespace') . $this->container['basename'];
+        $this->container['basename']    = studly_case($this->container['slug']);
+        $this->container['namespace']   = config("modules.locations.{$this->container['location']}.namespace") . $this->container['basename'];
 
         $this->comment('You have provided the following manifest information:');
         $this->comment('Name:                       ' . $this->container['name']);
@@ -179,35 +173,51 @@ class MakeModuleCommand extends Command
      */
     protected function generateModule()
     {
-        if (!$this->files->isDirectory(module_path())) {
-            $this->files->makeDirectory(module_path());
+        $location = $this->container['location'];
+        $root     = module_path(null, '', $location);
+        $manifest = config("modules.locations.$location.manifest") ?: 'module.json';
+        $provider = config("modules.locations.$location.provider") ?: 'ModuleServiceProvider';
+
+        if (!$this->files->isDirectory($root)) {
+            $this->files->makeDirectory($root);
         }
 
-        $pathMap = config('modules.pathMap');
-        $directory = module_path(null, $this->container['basename']);
-        $source = __DIR__ . '/../../../resources/stubs/module';
+        $mapping   = config("modules.locations.$location.mapping");
+        $directory = module_path(null, $this->container['basename'], $location);
+        $source    = __DIR__ . '/../../../resources/stubs/module';
 
         $this->files->makeDirectory($directory);
 
         $sourceFiles = $this->files->allFiles($source, true);
 
-        if (!empty($pathMap)) {
-            $search = array_keys($pathMap);
-            $replace = array_values($pathMap);
+        if (!empty($mapping)) {
+            $search = array_keys($mapping);
+            $replace = array_values($mapping);
         }
 
         foreach ($sourceFiles as $file) {
             $contents = $this->replacePlaceholders($file->getContents());
             $subPath = $file->getRelativePathname();
 
-            if (!empty($pathMap)) {
+            if (!empty($mapping)) {
                 $subPath = str_replace($search, $replace, $subPath);
             }
 
             $filePath = $directory . '/' . $subPath;
+            
+            // if the file is module.json, replace it with the custom manifest file name
+            if ($file->getFilename() === 'module.json' && $manifest) {
+                $filePath = str_replace('module.json', $manifest, $filePath);
+            }
+            
+            // if the file is ModuleServiceProvider.php, replace it with the custom provider file name
+            if ($file->getFilename() === 'ModuleServiceProvider.php') {
+                $filePath = str_replace('ModuleServiceProvider', $provider, $filePath);
+            }
+            
             $dir = dirname($filePath);
-
-            if (!$this->files->isDirectory($dir)) {
+            
+            if (! $this->files->isDirectory($dir)) {
                 $this->files->makeDirectory($dir, 0755, true);
             }
 
@@ -217,6 +227,9 @@ class MakeModuleCommand extends Command
 
     protected function replacePlaceholders($contents)
     {
+        $location = $this->container['location'];
+        $mapping  = config("modules.locations.$location.mapping");
+        
         $find = [
             'DummyBasename',
             'DummyNamespace',
@@ -224,8 +237,21 @@ class MakeModuleCommand extends Command
             'DummySlug',
             'DummyVersion',
             'DummyDescription',
+            'DummyLocation',
+            'DummyProvider',
+            
+            'ConfigMapping',
+            'DatabaseFactoriesMapping',
+            'DatabaseMigrationsMapping',
+            'DatabaseSeedsMapping',
+            'HttpControllersMapping',
+            'HttpMiddlewareMapping',
+            'ProvidersMapping',
+            'ResourcesLangMapping',
+            'ResourcesViewsMapping',
+            'RoutesMapping',
         ];
-
+        
         $replace = [
             $this->container['basename'],
             $this->container['namespace'],
@@ -233,6 +259,19 @@ class MakeModuleCommand extends Command
             $this->container['slug'],
             $this->container['version'],
             $this->container['description'],
+            $this->container['location'] ?? config('modules.default_location'),
+            $this->container['provider'],
+
+            $mapping['Config']              ?? 'Config',
+            $mapping['Database/Factories']  ?? 'Database/Factories',
+            $mapping['Database/Migrations'] ?? 'Database/Migrations',
+            $mapping['Database/Seeds']      ?? 'Database/Seeds',
+            $mapping['Http/Controllers']    ?? 'Http/Controllers',
+            $mapping['Http/Middleware']     ?? 'Http/Middleware',
+            $mapping['Providers']           ?? 'Providers',
+            $mapping['Resources/Lang']      ?? 'Resources/Lang',
+            $mapping['Resources/Views']     ?? 'Resources/Views',
+            $mapping['Routes']              ?? 'Routes'
         ];
 
         return str_replace($find, $replace, $contents);

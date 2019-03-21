@@ -11,7 +11,7 @@ class CommandMakeMiddlewareTest extends BaseTestCase
 
     protected $finder;
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
@@ -33,7 +33,7 @@ class CommandMakeMiddlewareTest extends BaseTestCase
     /** @test */
     public function it_can_generate_a_new_middleware_with_custom_module_namespace()
     {
-        $this->app['config']->set('modules.namespace', 'App\\MiddlewareModules\\');
+        $this->app['config']->set("modules.locations.$this->default.namespace", 'App\\MiddlewareModules\\');
 
         $this->artisan('make:module:middleware', ['slug' => 'middleware', 'name' => 'CustomMiddleware']);
 
@@ -42,7 +42,7 @@ class CommandMakeMiddlewareTest extends BaseTestCase
         $this->assertMatchesSnapshot($file);
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         $this->finder->deleteDirectory(module_path('middleware'));
 

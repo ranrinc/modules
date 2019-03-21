@@ -8,18 +8,18 @@ class RepositoryTest extends BaseTestCase
 {
     protected $finder;
 
+    /**
+     * @var \Caffeinated\Modules\Repositories\Repository
+     */
     protected $repository;
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
         $this->finder = $this->app['files'];
 
-        $this->repository = new \Caffeinated\Modules\Modules(
-            $this->app,
-            $this->app->make(\Caffeinated\Modules\Contracts\Repository::class)
-        );
+        $this->repository = modules();
 
         $this->artisan('make:module', ['slug' => 'RepositoryMod2', '--quick' => 'quick']);
 
@@ -121,9 +121,10 @@ class RepositoryTest extends BaseTestCase
     {
         $this->artisan('make:module', ['slug' => 'barbiz', '--quick' => 'quick']);
 
-        // Quick and fast way to simulate legacy Module FolderStructure
+        // Quick and fast way to simulate legacy module folder structure
         // https://github.com/caffeinated/modules/pull/224
         rename(realpath(module_path('barbiz')), realpath(module_path()) . '/BarBiz');
+        
         file_put_contents(realpath(module_path()) . '/BarBiz/module.json', json_encode(array(
             'name' => 'BarBiz', 'slug' => 'BarBiz', 'version' => '1.0', 'description' => '',
         ), JSON_PRETTY_PRINT));
@@ -137,8 +138,6 @@ class RepositoryTest extends BaseTestCase
             realpath(module_path() . '/BarBiz'),
             realpath($this->repository->getModulePath('BarBiz'))
         );
-
-        $this->finder->deleteDirectory(module_path() . '/BarBiz');
     }
 
     /** @test */
@@ -155,18 +154,16 @@ class RepositoryTest extends BaseTestCase
         ), JSON_PRETTY_PRINT));
 
         $this->assertTrue($this->repository->exists('FooBar'));
-
-        $this->finder->deleteDirectory(module_path() . '/FooBar');
     }
 
     /** @test */
     public function it_can_get_custom_modules_namespace()
     {
-        $this->app['config']->set('modules.namespace', 'App\\Foo\\Bar\\Baz\\Tests');
+        $this->app['config']->set("modules.locations.{$this->default}.namespace", 'App\\Foo\\Bar\\Baz\\Tests');
 
         $this->assertSame('App\Foo\Bar\Baz\Tests', $this->repository->getNamespace());
 
-        $this->app['config']->set('modules.namespace', 'App\\Foo\\Baz\\Bar\\Tests\\');
+        $this->app['config']->set("modules.locations.{$this->default}.namespace", 'App\\Foo\\Baz\\Bar\\Tests\\');
 
         $this->assertSame('App\Foo\Baz\Bar\Tests', $this->repository->getNamespace());
     }
@@ -294,13 +291,17 @@ class RepositoryTest extends BaseTestCase
         $manifest = $this->repository->getManifest('unknown');
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         $this->finder->deleteDirectory(module_path('repositorymod1'));
 
         $this->finder->deleteDirectory(module_path('repositorymod2'));
 
         $this->finder->deleteDirectory(module_path('repositorymod3'));
+
+        $this->finder->deleteDirectory(module_path() . '/BarBiz');
+
+        $this->finder->deleteDirectory(module_path() . '/FooBar');
 
         parent::tearDown();
     }

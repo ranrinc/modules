@@ -11,7 +11,7 @@ class CommandMakeSeederTest extends BaseTestCase
 
     protected $finder;
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
@@ -33,7 +33,7 @@ class CommandMakeSeederTest extends BaseTestCase
     /** @test */
     public function it_can_generate_a_new_seeder_with_custom_module_namespace()
     {
-        $this->app['config']->set('modules.namespace', 'App\\CustomSeederNamespace\\');
+        $this->app['config']->set("modules.locations.$this->default.namespace", 'App\\CustomSeederNamespace\\');
 
         $this->artisan('make:module:seeder', ['slug' => 'seeder', 'name' => 'CustomSeeder']);
 
@@ -42,7 +42,7 @@ class CommandMakeSeederTest extends BaseTestCase
         $this->assertMatchesSnapshot($file);
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         $this->finder->deleteDirectory(module_path('seeder'));
 

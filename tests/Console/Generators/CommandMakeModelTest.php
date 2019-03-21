@@ -11,7 +11,7 @@ class CommandMakeModelTest extends BaseTestCase
 
     protected $finder;
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
@@ -40,7 +40,7 @@ class CommandMakeModelTest extends BaseTestCase
     /** @test */
     public function it_can_generate_a_new_model_with_custom_module_namespace()
     {
-        $this->app['config']->set('modules.namespace', 'App\\CustomModelNamespace\\');
+        $this->app['config']->set("modules.locations.$this->default.namespace", 'App\\CustomModelNamespace\\');
 
         $this->artisan('make:module:model', ['slug' => 'model', 'name' => 'CustomModel']);
 
@@ -59,7 +59,7 @@ class CommandMakeModelTest extends BaseTestCase
         $this->assertMatchesSnapshot($file);
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         $this->finder->deleteDirectory(module_path('model'));
 
